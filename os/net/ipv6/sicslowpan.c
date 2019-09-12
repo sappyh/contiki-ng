@@ -251,6 +251,10 @@ struct sicslowpan_frag_info {
 
   /** Fragment size of first fragment */
   uint16_t first_frag_len;
+
+  /** Interface id - needed to when defragmentin into uipbuf. */
+  uint8_t interface_id;
+
   /** First fragment - needs a larger buffer since the size is uncompressed size
    and we need to know total size to know when we have received last fragment. */
   uint8_t first_frag[SICSLOWPAN_FIRST_FRAGMENT_SIZE];
@@ -357,6 +361,10 @@ add_fragment(uint16_t tag, uint16_t frag_size, uint8_t offset)
     linkaddr_copy(&frag_info[found].sender,
                   packetbuf_addr(PACKETBUF_ADDR_SENDER));
     timer_set(&frag_info[found].reass_timer, SICSLOWPAN_REASS_MAXAGE * CLOCK_SECOND / 16);
+    /* We need to remember the interface ID from the packet-buf packets when
+       reassembling packet. Zero would mean "default" interface. */
+    frag_info[found].interface_id = packetbuf_attr(PACKETBUF_ATTR_INTERFACE_ID);
+
     /* first fragment can not be stored immediately but is moved into
        the buffer while uncompressing */
     return found;
@@ -411,6 +419,9 @@ copy_frags2uip(int context)
              (uint8_t *)frag_buf[i].data, frag_buf[i].len);
     }
   }
+
+  uipbuf_set_attr(UIPBUF_ATTR_INTERFACE_ID, frag_info[context].interface_id);
+
   /* deallocate all the fragments for this context */
   clear_fragments(context);
 }
@@ -1527,6 +1538,7 @@ static uint8_t
 output(const linkaddr_t *localdest)
 {
   int frag_needed;
+  int iid;
 
   /* The MAC address of the destination of the packet */
   linkaddr_t dest;
@@ -1557,6 +1569,12 @@ output(const linkaddr_t *localdest)
   }
 
   LOG_INFO("output: sending IPv6 packet with len %d\n", uip_len);
+
+  iid = uipbuf_get_attr(UIPBUF_ATTR_INTERFACE_ID);
+  if(iid != 0) {
+    packetbuf_set_attr(PACKETBUF_ATTR_INTERFACE_ID, iid);
+    LOG_DBG("Setting IID for packetbuf: %d\n", iid);
+  }
 
   /* copy over the retransmission count from uipbuf attributes */
   packetbuf_set_attr(PACKETBUF_ATTR_MAX_MAC_TRANSMISSIONS,
@@ -1965,9 +1983,15 @@ input(void)
       uip_len = frag_size;
     } else {
       uip_len = packetbuf_payload_len + uncomp_hdr_len;
+      /* This is a single fragment packet already put into uipbuf - set IID */
+      uipbuf_set_attr(UIPBUF_ATTR_INTERFACE_ID,
+                      packetbuf_attr(PACKETBUF_ATTR_INTERFACE_ID));
     }
 #else
     uip_len = packetbuf_payload_len + uncomp_hdr_len;
+    /* This is a single fragment packet already put into uipbuf - set IID */
+    uipbuf_set_attr(UIPBUF_ATTR_INTERFACE_ID,
+                    packetbuf_attr(PACKETBUF_ATTR_INTERFACE_ID));
 #endif /* SICSLOWPAN_CONF_FRAG */
     LOG_INFO("input: received IPv6 packet with len %d\n",
              uip_len);

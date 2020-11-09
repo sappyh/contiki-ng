@@ -82,6 +82,8 @@
 #define NETSTACK_MAC     nullmac_driver
 #elif MAC_CONF_WITH_CSMA
 #define NETSTACK_MAC     csma_driver
+#elif MAC_CONF_WITH_SDR_CSMA
+#define NETSTACK_MAC     sdr_csma_driver
 #elif MAC_CONF_WITH_TSCH
 #define NETSTACK_MAC     tschmac_driver
 #elif MAC_CONF_WITH_BLE

@@ -38,15 +38,15 @@
  *         Simon Duquennoy <simon.duquennoy@inria.fr>
  */
 
-#include "net/mac/csma/csma.h"
-#include "net/mac/csma/csma-output.h"
+#include "csma.h"
+#include "csma-output.h"
 #include "net/mac/mac-sequence.h"
 #include "net/packetbuf.h"
 #include "net/netstack.h"
 
 /* Log configuration */
 #include "sys/log.h"
-#define LOG_MODULE "SDR CSMA"
+#define LOG_MODULE "SDR_CSMA"
 #define LOG_LEVEL LOG_LEVEL_MAC
 
 
@@ -77,10 +77,11 @@ input_packet(void)
 #if CSMA_SEND_SOFT_ACK
   uint8_t ackdata[CSMA_ACK_LEN];
 #endif
-
+  LOG_INFO (" Enters Here \n");
   if(packetbuf_datalen() == CSMA_ACK_LEN) {
     /* Ignore ack packets */
-    LOG_DBG("ignored ack\n");
+    csma_ack_received();
+    // LOG_DBG("ignored ack\n");
   } else if(csma_security_parse_frame() < 0) {
     LOG_ERR("failed to parse %u\n", packetbuf_datalen());
   } else if(!linkaddr_cmp(packetbuf_addr(PACKETBUF_ADDR_RECEIVER),

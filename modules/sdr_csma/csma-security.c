@@ -43,9 +43,9 @@
 */
 
 #include "contiki.h"
-#include "net/mac/csma/csma.h"
-#include "net/mac/csma/anti-replay.h"
-#include "net/mac/csma/csma-security.h"
+#include "csma.h"
+#include "anti-replay.h"
+#include "csma-security.h"
 #include "net/mac/framer/frame802154.h"
 #include "net/mac/framer/framer-802154.h"
 #include "net/mac/llsec802154.h"

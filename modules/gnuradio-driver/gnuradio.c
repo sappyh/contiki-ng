@@ -75,7 +75,6 @@ prepare(const void *payload, unsigned short payload_len)
   LOG_INFO("prepare %u bytes\n", payload_len);
   tx_buf[0] = (uint8_t)packetbuf_attr(PACKETBUF_ATTR_INTERFACE_ID);
   memcpy(&tx_buf[1], payload, MIN(sizeof(tx_buf), payload_len));
-  // LOG_DBG("Received message with interface id: %d \n", packetbuf_attr(PACKETBUF_ATTR_INTERFACE_ID));
   return 1;
 }
 /*---------------------------------------------------------------------------*/
@@ -121,12 +120,12 @@ radio_read(void *buf, unsigned short buf_len)
     LOG_DBG("Received message on interface: %d \n", iid);
 
     //Check checksum and put the data into the packetbuf
-    if (ret >= 2 && (ret - 2) <= buf_len)
+    if (ret >= 2 && (ret - 3) <= buf_len)
     {
       checksum = crc16_data(&rx_buf[1], ret - 3, 0);
       if (((uint8_t *)rx_buf)[ret - 2] == (checksum & 0xFF) && ((uint8_t *)rx_buf)[ret - 1] == checksum >> 8)
       {
-        LOG_INFO("received %u bytes\n", ret - 2);
+        LOG_INFO("received %u bytes\n", ret - 3);
         memcpy(buf, &rx_buf[1], sizeof(uint8_t) * ret - 3);
         return ret - 3;
       }

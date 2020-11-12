@@ -78,7 +78,7 @@
 #define CSMA_MAC_MAX_HEADER 21
 
 
-extern const struct mac_driver csma_driver;
+extern const struct mac_driver sdr_csma_driver;
 
 /* CSMA security framer functions */
 int csma_security_create_frame(void);

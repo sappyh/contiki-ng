@@ -190,7 +190,7 @@ send_one_packet(struct neighbor_queue *n, struct packet_queue *q)
     uint8_t dsn;
     dsn = ((uint8_t *)packetbuf_hdrptr())[2] & 0xff;
 
-    packetbuf_set_attr(PACKETBUF_ATTR_INTERFACE_ID, 0);
+    packetbuf_set_attr(PACKETBUF_ATTR_INTERFACE_ID, 1);
     NETSTACK_RADIO.prepare(packetbuf_hdrptr(), packetbuf_totlen());
 
     is_broadcast = packetbuf_holds_broadcast();
@@ -446,6 +446,7 @@ csma_output_packet(mac_callback_t sent, void *ptr)
   static uint8_t initialized = 0;
   static uint8_t seqno;
   const linkaddr_t *addr = packetbuf_addr(PACKETBUF_ADDR_RECEIVER);
+
 
   if(!initialized) {
     initialized = 1;

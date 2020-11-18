@@ -187,7 +187,7 @@ static int
 send_one_packet(struct neighbor_queue *n, struct packet_queue *q)
 {
   static int sent_ptr = 0;
-  int ret;
+  int ret = MAC_TX_ERR;
   int last_sent_ok = 0;
 
   packetbuf_set_addr(PACKETBUF_ADDR_SENDER, &linkaddr_node_addr);
@@ -244,7 +244,7 @@ send_one_packet(struct neighbor_queue *n, struct packet_queue *q)
           linkaddr_copy(&sent_messages[sent_ptr].destination,
                         packetbuf_addr(PACKETBUF_ADDR_RECEIVER));
           sent_ptr++;
-
+          queuebuf_update_attr_from_packetbuf(q->buf);
           ctimer_set(&n->sent_timer, CSMA_ACK_WAIT_TIME, ack_timer_expired, n);
         }
         // else {
@@ -507,8 +507,10 @@ ack_timer_expired(void *ptr)
     struct packet_queue *q = list_head(n->packet_queue);
     if (q != NULL)
     {
+      LOG_DBG("ACK Timer Expired \n");
       //TODO: Need to be able to check for MAC_TX_NOACK
       int status = MAC_TX_COLLISION;
+      queuebuf_to_packetbuf(q->buf);
       packet_sent(n, q, status, 1);
     }
   }
@@ -522,12 +524,15 @@ void csma_ack_received()
   {
     if (sent_messages[i].seqno == dsn)
     {
-      struct neighbor_queue* n = neighbor_queue_from_addr(&sent_messages[i].destination);
+      struct neighbor_queue *n = neighbor_queue_from_addr(&sent_messages[i].destination);
       if (n)
       {
         struct packet_queue *q = list_head(n->packet_queue);
         if (q != NULL)
         {
+          LOG_DBG("Received ACK \n");
+          ctimer_stop(&n->sent_timer);
+          queuebuf_to_packetbuf(q->buf);
           packet_sent(n, q, MAC_TX_OK, 1);
         }
       }
@@ -535,119 +540,120 @@ void csma_ack_received()
   }
 }
 
-    /*---------------------------------------------------------------------------*/
-    /*---------------------------------------------------------------------------*/
-    void csma_output_packet(mac_callback_t sent, void *ptr)
-    {
-      struct packet_queue *q;
-      struct neighbor_queue *n;
-      static uint8_t initialized = 0;
-      static uint8_t seqno;
-      const linkaddr_t *addr = packetbuf_addr(PACKETBUF_ADDR_RECEIVER);
+/*---------------------------------------------------------------------------*/
+/*---------------------------------------------------------------------------*/
+void csma_output_packet(mac_callback_t sent, void *ptr)
+{
+  struct packet_queue *q;
+  struct neighbor_queue *n;
+  static uint8_t initialized = 0;
+  static uint8_t seqno;
+  const linkaddr_t *addr = packetbuf_addr(PACKETBUF_ADDR_RECEIVER);
 
-      if (!initialized)
-      {
-        initialized = 1;
-        /* Initialize the sequence number to a random value as per 802.15.4. */
-        seqno = random_rand();
-      }
+  if (!initialized)
+  {
+    initialized = 1;
+    /* Initialize the sequence number to a random value as per 802.15.4. */
+    seqno = random_rand();
+  }
 
-      if (seqno == 0)
-      {
-        /* PACKETBUF_ATTR_MAC_SEQNO cannot be zero, due to a pecuilarity
+  if (seqno == 0)
+  {
+    /* PACKETBUF_ATTR_MAC_SEQNO cannot be zero, due to a pecuilarity
        in framer-802154.c. */
-        seqno++;
-      }
-      packetbuf_set_attr(PACKETBUF_ATTR_MAC_SEQNO, seqno++);
-      packetbuf_set_attr(PACKETBUF_ATTR_FRAME_TYPE, FRAME802154_DATAFRAME);
+    seqno++;
+  }
 
-      /* Look for the neighbor entry */
-      n = neighbor_queue_from_addr(addr);
-      if (n == NULL)
-      {
-        /* Allocate a new neighbor entry */
-        n = memb_alloc(&neighbor_memb);
-        if (n != NULL)
-        {
-          /* Init neighbor entry */
-          linkaddr_copy(&n->addr, addr);
-          n->transmissions = 0;
-          n->collisions = 0;
-          /* Init packet queue for this neighbor */
-          LIST_STRUCT_INIT(n, packet_queue);
-          /* Add neighbor to the neighbor list */
-          list_add(neighbor_list, n);
-        }
-      }
+  packetbuf_set_attr(PACKETBUF_ATTR_MAC_SEQNO, seqno++);
+  packetbuf_set_attr(PACKETBUF_ATTR_FRAME_TYPE, FRAME802154_DATAFRAME);
 
-      if (n != NULL)
-      {
-        /* Add packet to the neighbor's queue */
-        if (list_length(n->packet_queue) < CSMA_MAX_PACKET_PER_NEIGHBOR)
-        {
-          q = memb_alloc(&packet_memb);
-          if (q != NULL)
-          {
-            q->ptr = memb_alloc(&metadata_memb);
-            if (q->ptr != NULL)
-            {
-              q->buf = queuebuf_new_from_packetbuf();
-              if (q->buf != NULL)
-              {
-                struct qbuf_metadata *metadata = (struct qbuf_metadata *)q->ptr;
-                /* Neighbor and packet successfully allocated */
-                metadata->max_transmissions = packetbuf_attr(PACKETBUF_ATTR_MAX_MAC_TRANSMISSIONS);
-                if (metadata->max_transmissions == 0)
-                {
-                  /* If not set by the application, use the default CSMA value */
-                  metadata->max_transmissions = CSMA_MAX_FRAME_RETRIES + 1;
-                }
-                metadata->sent = sent;
-                metadata->cptr = ptr;
-                list_add(n->packet_queue, q);
-
-                LOG_INFO("sending to ");
-                LOG_INFO_LLADDR(addr);
-                LOG_INFO_(", len %u, seqno %u, queue length %d, free packets %d\n",
-                          packetbuf_datalen(),
-                          packetbuf_attr(PACKETBUF_ATTR_MAC_SEQNO),
-                          list_length(n->packet_queue), memb_numfree(&packet_memb));
-                /* If q is the first packet in the neighbor's queue, send asap */
-                if (list_head(n->packet_queue) == q)
-                {
-                  schedule_transmission(n);
-                }
-                return;
-              }
-              memb_free(&metadata_memb, q->ptr);
-              LOG_WARN("could not allocate queuebuf, dropping packet\n");
-            }
-            memb_free(&packet_memb, q);
-            LOG_WARN("could not allocate queuebuf, dropping packet\n");
-          }
-          /* The packet allocation failed. Remove and free neighbor entry if empty. */
-          if (list_length(n->packet_queue) == 0)
-          {
-            list_remove(neighbor_list, n);
-            memb_free(&neighbor_memb, n);
-          }
-        }
-        else
-        {
-          LOG_WARN("Neighbor queue full\n");
-        }
-        LOG_WARN("could not allocate packet, dropping packet\n");
-      }
-      else
-      {
-        LOG_WARN("could not allocate neighbor, dropping packet\n");
-      }
-      mac_call_sent_callback(sent, ptr, MAC_TX_ERR, 1);
-    }
-    /*---------------------------------------------------------------------------*/
-    void csma_output_init(void)
+  /* Look for the neighbor entry */
+  n = neighbor_queue_from_addr(addr);
+  if (n == NULL)
+  {
+    /* Allocate a new neighbor entry */
+    n = memb_alloc(&neighbor_memb);
+    if (n != NULL)
     {
-      memb_init(&packet_memb);
-      memb_init(&metadata_memb);
-      memb_init(&neighbor_memb);
+      /* Init neighbor entry */
+      linkaddr_copy(&n->addr, addr);
+      n->transmissions = 0;
+      n->collisions = 0;
+      /* Init packet queue for this neighbor */
+      LIST_STRUCT_INIT(n, packet_queue);
+      /* Add neighbor to the neighbor list */
+      list_add(neighbor_list, n);
     }
+  }
+
+  if (n != NULL)
+  {
+    /* Add packet to the neighbor's queue */
+    if (list_length(n->packet_queue) < CSMA_MAX_PACKET_PER_NEIGHBOR)
+    {
+      q = memb_alloc(&packet_memb);
+      if (q != NULL)
+      {
+        q->ptr = memb_alloc(&metadata_memb);
+        if (q->ptr != NULL)
+        {
+          q->buf = queuebuf_new_from_packetbuf();
+          if (q->buf != NULL)
+          {
+            struct qbuf_metadata *metadata = (struct qbuf_metadata *)q->ptr;
+            /* Neighbor and packet successfully allocated */
+            metadata->max_transmissions = packetbuf_attr(PACKETBUF_ATTR_MAX_MAC_TRANSMISSIONS);
+            if (metadata->max_transmissions == 0)
+            {
+              /* If not set by the application, use the default CSMA value */
+              metadata->max_transmissions = CSMA_MAX_FRAME_RETRIES + 1;
+            }
+            metadata->sent = sent;
+            metadata->cptr = ptr;
+            list_add(n->packet_queue, q);
+
+            LOG_INFO("sending to ");
+            LOG_INFO_LLADDR(addr);
+            LOG_INFO_(", len %u, seqno %u, queue length %d, free packets %d\n",
+                      packetbuf_datalen(),
+                      packetbuf_attr(PACKETBUF_ATTR_MAC_SEQNO),
+                      list_length(n->packet_queue), memb_numfree(&packet_memb));
+            /* If q is the first packet in the neighbor's queue, send asap */
+            if (list_head(n->packet_queue) == q)
+            {
+              schedule_transmission(n);
+            }
+            return;
+          }
+          memb_free(&metadata_memb, q->ptr);
+          LOG_WARN("could not allocate queuebuf, dropping packet\n");
+        }
+        memb_free(&packet_memb, q);
+        LOG_WARN("could not allocate queuebuf, dropping packet\n");
+      }
+      /* The packet allocation failed. Remove and free neighbor entry if empty. */
+      if (list_length(n->packet_queue) == 0)
+      {
+        list_remove(neighbor_list, n);
+        memb_free(&neighbor_memb, n);
+      }
+    }
+    else
+    {
+      LOG_WARN("Neighbor queue full\n");
+    }
+    LOG_WARN("could not allocate packet, dropping packet\n");
+  }
+  else
+  {
+    LOG_WARN("could not allocate neighbor, dropping packet\n");
+  }
+  mac_call_sent_callback(sent, ptr, MAC_TX_ERR, 1);
+}
+/*---------------------------------------------------------------------------*/
+void csma_output_init(void)
+{
+  memb_init(&packet_memb);
+  memb_init(&metadata_memb);
+  memb_init(&neighbor_memb);
+}

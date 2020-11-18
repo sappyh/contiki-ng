@@ -1,7 +1,6 @@
 MODULES += os/services/slip-cmd
 MODULES += os/services/shell
 
-MAKE_MAC = MAKE_MAC_OTHER
 MAKE_NET = MAKE_NET_IPV6
 
 

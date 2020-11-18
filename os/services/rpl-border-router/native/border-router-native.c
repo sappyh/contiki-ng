@@ -69,11 +69,11 @@ CMD_HANDLERS(border_router_cmd_handler);
 PROCESS(border_router_process, "Border router process");
 
 /*---------------------------------------------------------------------------*/
-static void
-request_mac(void)
-{
-  write_to_slip((uint8_t *)"?M", 2);
-}
+// static void
+// request_mac(void)
+// {
+//   write_to_slip((uint8_t *)"?M", 2);
+// }
 /*---------------------------------------------------------------------------*/
 void
 border_router_set_mac(const uint8_t *data)
@@ -116,12 +116,13 @@ PROCESS_THREAD(border_router_process, ev, data)
   /* tun init is also responsible for setting up the SLIP connection */
   tun_init();
 
-  while(!mac_set) {
-    etimer_set(&et, CLOCK_SECOND);
-    request_mac();
-    PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
-  }
-
+  // while(!mac_set) {
+  //   etimer_set(&et, CLOCK_SECOND);
+  //   LOG_INFO("Enters here \n");
+  //   request_mac();
+  //   PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
+  // }
+  border_router_set_mac((const uint8_t *)&linkaddr_node_addr);
   if(slip_config_ipaddr != NULL) {
     uip_ipaddr_t prefix;
 

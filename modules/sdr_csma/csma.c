@@ -77,7 +77,6 @@ input_packet(void)
 #if CSMA_SEND_SOFT_ACK
   uint8_t ackdata[CSMA_ACK_LEN];
 #endif
-  LOG_INFO (" Enters Here \n");
   if(packetbuf_datalen() == CSMA_ACK_LEN) {
     /* Ignore ack packets */
     csma_ack_received();

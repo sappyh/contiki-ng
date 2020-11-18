@@ -1,4 +1,9 @@
 #include <zmq.h>
+#include <assert.h>
+
+#include <stdlib.h>
+#include <fcntl.h>
+#include <signal.h>
 
 #include "dev/nullradio.h"
 #include "net/netstack.h"
@@ -8,7 +13,7 @@
 /* Log configuration */
 #include "sys/log.h"
 #define LOG_MODULE "GRADIO"
-#define LOG_LEVEL LOG_LEVEL_DBG
+#define LOG_LEVEL LOG_LEVEL_NONE
 
 // TX PORT: PUB PORT
 #ifndef PUB_CONF_PORT
@@ -33,6 +38,16 @@ zmq_pollitem_t item;
 PROCESS(gnuradio_process, "GNURadio driver \n");
 
 /*---------------------------------------------------------------------------*/
+static void cleanup(int signo)
+{
+  //TODO: Cleanup not working properly
+  zmq_close(sink);
+  zmq_close(publisher);
+  zmq_ctx_destroy(context);
+  fprintf(stderr,"Exiting \n");
+  exit(0);
+}
+
 static int
 init(void)
 {
@@ -62,7 +77,22 @@ init(void)
 
   LOG_DBG("The endpoint is: %s \n", endpoint);
 
+  //Set Linger period for the sockets
+  int linger_period = 1;
+  int rc2 = zmq_setsockopt(publisher, ZMQ_LINGER, &linger_period, sizeof(int));
+
+  assert(rc2 == 0);
+
+  int rc3 = zmq_setsockopt(sink, ZMQ_LINGER, &linger_period, sizeof(int));
+
+  assert(rc3 == 0);
+
   item = (zmq_pollitem_t){sink, 0, ZMQ_POLLIN, 0};
+
+  signal(SIGHUP, cleanup);
+  signal(SIGTERM, cleanup);
+  signal(SIGINT, cleanup);
+
   /* Start process */
   process_start(&gnuradio_process, NULL);
 
@@ -167,6 +197,7 @@ off(void)
   zmq_close(sink);
   zmq_close(publisher);
   zmq_ctx_destroy(context);
+  printf("Exiting \n");
   return 0;
 }
 /*---------------------------------------------------------------------------*/

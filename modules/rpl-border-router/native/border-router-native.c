@@ -89,7 +89,7 @@ PROCESS_THREAD(border_router_process, ev, data)
   PROCESS_PAUSE();
 
   process_start(&border_router_cmd_process, NULL);
-
+  
   PRINTF("RPL-Border router started\n");
 
   slip_config_handle_arguments(contiki_argc, contiki_argv);
@@ -98,6 +98,7 @@ PROCESS_THREAD(border_router_process, ev, data)
   tun_init();
   border_router_set_mac((const uint8_t *)&linkaddr_node_addr);
 
+ 
   if(slip_config_ipaddr != NULL) {
     uip_ipaddr_t prefix;
 

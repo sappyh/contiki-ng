@@ -203,7 +203,7 @@ tun_init()
 {
   setvbuf(stdout, NULL, _IOLBF, 0); /* Line buffered output. */
 
-  slip_init();
+  // slip_init();
 
   LOG_INFO("Opening tun interface:%s\n", slip_config_tundev);
 

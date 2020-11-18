@@ -31,7 +31,7 @@
 #define NETSTACK_CONF_NETWORK sicslowpan_driver
 
 /* use a non-default MAC driver */
-#define NETSTACK_CONF_MAC border_router_mac_driver
+
 
 #define SLIP_DEV_CONF_SEND_DELAY (CLOCK_SECOND / 32)
 

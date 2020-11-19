@@ -13,7 +13,7 @@
 /* Log configuration */
 #include "sys/log.h"
 #define LOG_MODULE "GRADIO"
-#define LOG_LEVEL LOG_LEVEL_NONE
+#define LOG_LEVEL LOG_LEVEL_DBG
 
 // TX PORT: PUB PORT
 #ifndef PUB_CONF_PORT

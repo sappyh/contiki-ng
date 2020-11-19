@@ -212,10 +212,15 @@ send_one_packet(struct neighbor_queue *n, struct packet_queue *q)
     uint8_t dsn;
     dsn = ((uint8_t *)packetbuf_hdrptr())[2] & 0xff;
 
-    packetbuf_set_attr(PACKETBUF_ATTR_INTERFACE_ID, 1);
+    is_broadcast = packetbuf_holds_broadcast();
+    
+    if (is_broadcast)
+    {
+      packetbuf_set_attr(PACKETBUF_ATTR_INTERFACE_ID, 0);
+    }
     NETSTACK_RADIO.prepare(packetbuf_hdrptr(), packetbuf_totlen());
 
-    is_broadcast = packetbuf_holds_broadcast();
+    
 
     if (NETSTACK_RADIO.receiving_packet() ||
         (!is_broadcast && NETSTACK_RADIO.pending_packet()))
@@ -228,7 +233,6 @@ send_one_packet(struct neighbor_queue *n, struct packet_queue *q)
     }
     else
     {
-
       switch (NETSTACK_RADIO.transmit(packetbuf_totlen()))
       {
       case RADIO_TX_OK:

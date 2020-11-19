@@ -186,6 +186,7 @@ uip_ds6_nbr_add(const uip_ipaddr_t *ipaddr, const uip_lladdr_t *lladdr,
     nbr->isrouter = isrouter;
 #endif /* UIP_ND6_SEND_RA || !UIP_CONF_ROUTER */
     nbr->state = state;
+    nbr->iid = uipbuf_get_attr(UIPBUF_ATTR_INTERFACE_ID);
 #if UIP_CONF_IPV6_QUEUE_PKT
     uip_packetqueue_new(&nbr->packethandle);
 #endif /* UIP_CONF_IPV6_QUEUE_PKT */
@@ -203,7 +204,8 @@ uip_ds6_nbr_add(const uip_ipaddr_t *ipaddr, const uip_lladdr_t *lladdr,
     LOG_INFO_6ADDR(ipaddr);
     LOG_INFO_(" link addr ");
     LOG_INFO_LLADDR((linkaddr_t*)lladdr);
-    LOG_INFO_(" state %u\n", state);
+    LOG_INFO_(" state %u ", state);
+    LOG_INFO_(" interface %u\n", nbr->iid);
     NETSTACK_ROUTING.neighbor_state_changed(nbr);
     return nbr;
   } else {

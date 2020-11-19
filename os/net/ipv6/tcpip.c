@@ -677,6 +677,7 @@ tcpip_ipv6_output(void)
 
   nbr = uip_ds6_nbr_lookup(nexthop);
 
+
 #if UIP_ND6_AUTOFILL_NBR_CACHE
   if(nbr == NULL) {
     /* Neighbor not found in cache? Derive its link-layer address from it's
@@ -725,6 +726,7 @@ tcpip_ipv6_output(void)
 
 send_packet:
   if(nbr) {
+    uipbuf_set_attr(UIPBUF_ATTR_INTERFACE_ID, nbr->iid);
     linkaddr = uip_ds6_nbr_get_ll(nbr);
   } else {
     linkaddr = NULL;
@@ -732,6 +734,7 @@ send_packet:
 
   LOG_INFO("output: sending to ");
   LOG_INFO_LLADDR((linkaddr_t *)linkaddr);
+  LOG_INFO(" on interface %d", uipbuf_get_attr(UIPBUF_ATTR_INTERFACE_ID));
   LOG_INFO_("\n");
   tcpip_output(linkaddr);
 

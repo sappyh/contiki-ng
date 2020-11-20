@@ -1,2 +1,0 @@
-MODULES += os/services/slip-cmd
-MODULES += os/services/shell
